@@ -11,10 +11,11 @@ datasource db {
 }
 
 model User {
-  id       String  @id @default(cuid())
-  email    String  @unique
-  username String  @unique
-  name     String?
+  id          String  @id @default(cuid())
+  email       String  @unique
+  username    String  @unique
+  name        String?
+  phoneNumber String? 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -25,6 +26,10 @@ model User {
   roles       Role[]
   sessions    Session[]
   connections Connection[]
+  listings Listing[]
+  listingComments ListingComment[]
+  listingUpvotes ListingUpvote[]
+  listingCommentUpvotes ListingCommentUpvote[]
 }
 
 model Note {
@@ -166,4 +171,115 @@ model Connection {
   userId String
 
   @@unique([providerName, providerId])
+}
+
+model ListingCategory {
+  id          String @id @default(cuid())
+  title       String 
+  description String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings Listing[]
+  listingCategoryImage ListingCategoryImage?
+}
+
+model Listing {
+  id          String @id @default(cuid())
+  title       String
+  description String 
+  isFeatured  Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listingCategory   ListingCategory @relation(fields: [listingCategoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  listingCategoryId String
+
+  city ListingCity @relation(fields: [cityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  cityId String
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  ownerId String
+
+  listingComments ListingComment[]
+  listingImages ListingImage[]
+  listingUpvotes ListingUpvote[]
+}
+
+model ListingCity {
+  id        String @id @default(cuid())
+  name      String
+  province  String
+  slug      String
+
+  listings Listing[]
+}
+
+model ListingImage {
+  id          String @id @default(cuid())
+  contentType String 
+  blob        Bytes 
+  isThumbnail Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  listingId String
+}
+
+model ListingCategoryImage {
+  id            String @id @default(cuid())
+  contentType   String
+  blob          Bytes 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listingCategory ListingCategory @relation(fields: [listingCategoryId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  listingCategoryId String @unique
+}
+
+model ListingComment {
+  id            String @id @default(cuid())
+  content       String 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  listingId String
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  ownerId String
+
+  listingCommentUpvotes ListingCommentUpvote[]
+}
+
+model ListingUpvote {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  listingId String
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  ownerId String
+
+  @@id([listingId, ownerId])
+}
+
+model ListingCommentUpvote {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listingComment ListingComment @relation(fields: [listingCommentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  listingCommentId String
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  ownerId String
+
+  @@id([listingCommentId, ownerId])
 }
