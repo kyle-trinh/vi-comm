@@ -255,6 +255,154 @@ async function seed() {
 	})
 	console.timeEnd(`🐨 Created admin user "kody"`)
 
+	console.time('Created Listing Categories')
+	const listingCategories = [
+		{
+			title: 'Houses for Rent',
+			slug: 'houses-for-rent',
+			description:
+				'Find a wide selection of houses available for rent. Browse through listings and choose the perfect house for your needs and budget.',
+		},
+		{
+			title: 'Condos for Rent',
+			slug: 'condos-for-rent',
+			description:
+				'Discover condominiums available for rent in your preferred location. Explore a range of options for your next home.',
+		},
+		{
+			title: 'Moving',
+			slug: 'moving',
+			description:
+				'Get assistance for your moving needs, from professional movers to packing services. Make your relocation hassle-free.',
+		},
+		{
+			title: 'Plumbing',
+			slug: 'plumbing',
+			description:
+				"Find reliable plumbers for all your plumbing needs. From repairs to installations, we've got you covered.",
+		},
+		{
+			title: 'Landscaping',
+			slug: 'landscaping',
+			description:
+				'Enhance the beauty of your outdoor space with landscaping services. Create a stunning garden or maintain your existing one.',
+		},
+		{
+			title: 'Rooms to Share',
+			slug: 'rooms-to-share',
+			description:
+				'Explore shared living arrangements with available rooms for rent. Save on housing costs by sharing a space with others.',
+		},
+		{
+			title: 'Houses for Sale',
+			slug: 'houses-for-sale',
+			description:
+				'Search for your dream home among a variety of houses available for sale. Find the perfect property to call your own.',
+		},
+		{
+			title: 'Carpet Cleaning',
+			slug: 'carpet-cleaning',
+			description:
+				'Revitalize your carpets with professional cleaning services. Remove stains and allergens to ensure a clean and healthy home.',
+		},
+		{
+			title: 'Cars for Sale',
+			slug: 'cars-for-sale',
+			description:
+				'Browse a selection of cars for sale from private sellers and dealerships. Find your ideal vehicle within your budget.',
+		},
+		{
+			title: 'Tutorial & Training',
+			slug: 'tutorial-training',
+			description:
+				'Access educational resources and training opportunities in various subjects. Learn and develop new skills for personal and professional growth.',
+		},
+		{
+			title: 'Business Opportunities',
+			slug: 'business-opportunities',
+			description:
+				'Explore business opportunities and investments to start or expand your entrepreneurial journey. Find the right venture for you.',
+		},
+		{
+			title: 'Financing - Investments',
+			slug: 'financing-investments',
+			description:
+				'Discover financial and investment services to help you grow your wealth. Plan for the future and secure your financial well-being.',
+		},
+		{
+			title: 'Employment',
+			slug: 'employment',
+			description:
+				'Find job listings and career opportunities in various industries. Start or advance your career with the right job.',
+		},
+		{
+			title: 'Health & Beauty',
+			slug: 'health-beauty',
+			description:
+				'Access health and beauty services to enhance your well-being. From salons to wellness centers, pamper yourself and stay healthy.',
+		},
+		{
+			title: 'Domestic Assistance',
+			slug: 'domestic-assistance',
+			description:
+				'Get assistance with domestic chores and tasks. Find reliable helpers for cleaning, cooking, and other household needs.',
+		},
+		{
+			title: 'Manufacturing Jobs',
+			slug: 'manufacturing-jobs',
+			description:
+				'Search for manufacturing and production job opportunities. Start or advance your career in the manufacturing industry.',
+		},
+		{
+			title: 'Hair - Nail Jobs',
+			slug: 'hair-nail-jobs',
+			description:
+				'Explore job opportunities in the beauty industry, from hairstyling to nail care. Find your next career in the world of beauty.',
+		},
+		{
+			title: 'Office - Clerical Jobs',
+			slug: 'office-clerical-jobs',
+			description:
+				'Discover administrative and clerical job openings in various office settings. Start your career in an office environment.',
+		},
+		{
+			title: 'Services',
+			slug: 'services',
+			description:
+				'Find a wide range of services for your personal and professional needs. Connect with service providers to get the job done.',
+		},
+		{
+			title: 'Child Care',
+			slug: 'child-care',
+			description:
+				'Find reliable child care services, including babysitters, daycares, and nannies. Ensure the safety and well-being of your children.',
+		},
+		{
+			title: 'Travel',
+			slug: 'travel',
+			description:
+				'Plan your next adventure with travel services and resources. Explore destinations, book flights, and make your travel dreams come true.',
+		},
+		{
+			title: 'Auto Repair',
+			slug: 'auto-repair',
+			description:
+				'Get your vehicle back on the road with professional auto repair services. Address car issues and keep your vehicle in top condition.',
+		},
+		{
+			title: 'Free Stuff',
+			slug: 'free-stuff',
+			description:
+				'Discover free items and giveaways from generous individuals and organizations. Get free stuff and reduce waste.',
+		},
+	]
+
+	for (const { title, slug, description } of listingCategories) {
+		await prisma.listingCategory.create({ data: { title, slug, description } })
+	}
+
+	console.timeEnd('Created Listing Categories')
+
 	console.timeEnd(`🌱 Database has been seeded`)
 }
 
