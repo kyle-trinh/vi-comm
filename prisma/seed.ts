@@ -140,7 +140,7 @@ async function seed() {
 
 	const githubUser = await insertGitHubUser('MOCK_CODE_GITHUB_KODY')
 
-	await prisma.user.create({
+	const adminUser = await prisma.user.create({
 		select: { id: true },
 		data: {
 			email: 'kody@kcd.dev',
@@ -257,12 +257,6 @@ async function seed() {
 
 	console.time('Created Listing Categories')
 	const listingCategories = [
-		{
-			title: 'Houses for Rent',
-			slug: 'houses-for-rent',
-			description:
-				'Find a wide selection of houses available for rent. Browse through listings and choose the perfect house for your needs and budget.',
-		},
 		{
 			title: 'Condos for Rent',
 			slug: 'condos-for-rent',
@@ -402,6 +396,55 @@ async function seed() {
 	}
 
 	console.timeEnd('Created Listing Categories')
+
+	console.time('Created sample Listing Category along with its listings')
+
+	const totalSampleListings = 15
+
+	const sampleListingCity = await prisma.listingCity.create({
+		select: { id: true },
+		data: {
+			name: 'Long Beach',
+			province: 'California',
+			slug: 'long-beach',
+		},
+	})
+
+	await prisma.listingCategory.create({
+		select: { id: true },
+		data: {
+			title: 'Houses for Rent',
+			slug: 'houses-for-rent',
+			description:
+				'Find a wide selection of houses available for rent. Browse through listings and choose the perfect house for your needs and budget.',
+			listings: {
+				create: Array.from({
+					length: totalSampleListings,
+				}).map((_, listingIndex) => ({
+					title: faker.lorem.sentence(),
+					description: faker.lorem.paragraphs(),
+					isFeatured: listingIndex === 0,
+					ownerId: adminUser.id,
+					cityId: sampleListingCity.id,
+					listingImages: {
+						create: Array.from({
+							length: faker.number.int({ min: 1, max: 3 }),
+						}).map((_, listingImageIndex) => {
+							const imgNumber = faker.number.int({ min: 0, max: 9 })
+							const img = { ...noteImages[imgNumber] }
+							delete img.altText
+							return {
+								...img,
+								isThumbnail: listingImageIndex === 0,
+							}
+						}),
+					},
+				})),
+			},
+		},
+	})
+
+	console.timeEnd('Created sample Listing Category along with its listings')
 
 	console.timeEnd(`🌱 Database has been seeded`)
 }
