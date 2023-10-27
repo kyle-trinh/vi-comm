@@ -29,3 +29,4 @@ export type IconName =
 	| 'sun'
 	| 'trash'
 	| 'update'
+	| 'value-none'

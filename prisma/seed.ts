@@ -428,7 +428,7 @@ async function seed() {
 					cityId: sampleListingCity.id,
 					listingImages: {
 						create: Array.from({
-							length: faker.number.int({ min: 1, max: 3 }),
+							length: faker.number.int({ min: 0, max: 3 }),
 						}).map((_, listingImageIndex) => {
 							const imgNumber = faker.number.int({ min: 0, max: 9 })
 							const img = { ...noteImages[imgNumber] }

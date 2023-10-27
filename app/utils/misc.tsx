@@ -13,6 +13,10 @@ export function getNoteImgSrc(imageId: string) {
 	return `/resources/note-images/${imageId}`
 }
 
+export function getListingImgSrc(imageId: string) {
+	return `/resources/listing-images/${imageId}`
+}
+
 export function getErrorMessage(error: unknown) {
 	if (typeof error === 'string') return error
 	if (
