@@ -15,6 +15,8 @@ export type IconName =
 	| 'file-text'
 	| 'github-logo'
 	| 'google-logo'
+	| 'heart-filled'
+	| 'heart-outline'
 	| 'laptop'
 	| 'link-2'
 	| 'lock-closed'

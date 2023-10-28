@@ -23,8 +23,6 @@ export async function loader() {
 		},
 	})
 
-	console.log(listingCategories)
-
 	return json({ listingCategories })
 }
 
