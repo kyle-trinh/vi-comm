@@ -4,7 +4,7 @@ import {
 	json,
 	type SerializeFrom,
 } from '@remix-run/node'
-import { Link, NavLink, useLoaderData } from '@remix-run/react'
+import { Link, useLoaderData } from '@remix-run/react'
 import { buttonVariants } from '#app/components/ui/button.tsx'
 import {
 	Card,
@@ -14,109 +14,70 @@ import {
 } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { prisma } from '#app/utils/db.server.ts'
-import { cn, getListingImgSrc, invariant } from '#app/utils/misc.tsx'
+import { getListingImgSrc, invariant } from '#app/utils/misc.tsx'
 
 export async function loader({ params }: LoaderFunctionArgs) {
-	const listingCategories = await prisma.listingCategory.findMany({
+	const listingCategories = await prisma.listingCategory.findFirst({
 		select: {
 			id: true,
-			slug: true,
-			title: true,
-			_count: {
+			listings: {
 				select: {
-					listings: {
-						where: {},
+					id: true,
+					title: true,
+					description: true,
+					isFeatured: true,
+					createdAt: true,
+					owner: {
+						select: {
+							name: true,
+							id: true,
+						},
+					},
+					city: {
+						select: {
+							name: true,
+							province: true,
+						},
+					},
+					listingImages: {
+						where: {
+							isThumbnail: true,
+						},
+						select: {
+							id: true,
+						},
 					},
 				},
 			},
 		},
-	})
-
-	const selectedListing = listingCategories.find(
-		category => category.slug === params.categorySlug,
-	)
-
-	invariant(selectedListing, 'Listing Category not found')
-
-	const listings = await prisma.listing.findMany({
-		where: { listingCategoryId: selectedListing.id },
-		select: {
-			id: true,
-			title: true,
-			description: true,
-			isFeatured: true,
-			createdAt: true,
-			owner: {
-				select: {
-					name: true,
-					id: true,
-				},
-			},
-			city: {
-				select: {
-					name: true,
-					province: true,
-				},
-			},
-			listingImages: {
-				where: {
-					isThumbnail: true,
-				},
-				select: {
-					id: true,
-				},
-			},
+		where: {
+			slug: params.categorySlug,
 		},
 	})
 
-	return json({ listingCategories, listings })
+	invariant(listingCategories, 'Listing Category not found')
+
+	return json({ listings: listingCategories.listings })
 }
 
 export default function CategorySlugIndex() {
-	const { listingCategories, listings } = useLoaderData<typeof loader>()
+	const { listings } = useLoaderData<typeof loader>()
 
 	return (
-		<div className="container grid h-full min-h-[400px] grid-cols-7 items-start gap-6">
-			<Card className="col-span-2 inline-block">
-				<CardHeader>
-					<CardTitle>Category</CardTitle>
-				</CardHeader>
-				<CardContent className="px-0">
-					<ul>
-						{listingCategories.map(category => (
-							<NavLink key={category.id} to={`/category/${category.slug}`}>
-								{({ isActive }) => (
-									<li
-										key={category.id}
-										className={cn(
-											'px-6 py-3 hover:bg-slate-300 hover:text-gray-800',
-											isActive && ' bg-primary text-primary-foreground',
-										)}
-									>
-										{category.title}
-									</li>
-								)}
-							</NavLink>
-						))}
-					</ul>
-				</CardContent>
-			</Card>
-			<div className="col-span-5 flex flex-col gap-8">
-				{listings.length === 0 ? (
-					<EmptyCard />
-				) : (
-					<>
-						<Listings
-							listings={listings.filter(listing => listing.isFeatured)}
-							isFeatured
-						/>
-						<Listings
-							listings={listings.filter(listing => !listing.isFeatured)}
-						/>
-					</>
-				)}
-			</div>
-			<h1>Slug</h1>
+		<div className="col-span-5 flex flex-col gap-8">
+			{listings.length === 0 ? (
+				<EmptyCard />
+			) : (
+				<>
+					<Listings
+						listings={listings.filter(listing => listing.isFeatured)}
+						isFeatured
+					/>
+					<Listings
+						listings={listings.filter(listing => !listing.isFeatured)}
+					/>
+				</>
+			)}
 		</div>
 	)
 }
