@@ -122,7 +122,7 @@ export default function ListingIndex() {
 		<Card className="px-8">
 			<CardHeader>
 				<CardTitle>
-					<div className="flex items-start">
+					<div className="flex items-start justify-between">
 						<h2 className="mb-2  text-h2 leading-none">{listing.title}</h2>
 						{renderLikeButton()}
 					</div>

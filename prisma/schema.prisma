@@ -190,7 +190,7 @@ model Listing {
   id          String @id @default(cuid())
   title       String
   description String 
-  isFeatured  Boolean
+  isFeatured  Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -216,6 +216,8 @@ model ListingCity {
   slug      String
 
   listings Listing[]
+
+  @@unique([name, province])
 }
 
 model ListingImage {

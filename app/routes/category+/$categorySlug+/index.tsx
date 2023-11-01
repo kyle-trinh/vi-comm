@@ -64,7 +64,10 @@ export default function CategorySlugIndex() {
 	const { listings } = useLoaderData<typeof loader>()
 
 	return (
-		<div className="col-span-5 flex flex-col gap-8">
+		<div className="col-span-5 flex flex-col items-end gap-8">
+			<Link to="new" className={buttonVariants()}>
+				+ New Listing
+			</Link>
 			{listings.length === 0 ? (
 				<EmptyCard />
 			) : (
