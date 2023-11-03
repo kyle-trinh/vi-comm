@@ -5,6 +5,7 @@ import {
 	useFieldList,
 	useFieldset,
 	useForm,
+	type Fieldset,
 } from '@conform-to/react'
 import { getFieldsetConstraint, parse } from '@conform-to/zod'
 import { createId } from '@paralleldrive/cuid2'
@@ -289,7 +290,7 @@ export default function NewListing() {
 										</option>
 									)),
 								}}
-								errors={fields.description.errors}
+								errors={fields.listingCategoryId.errors}
 							/>
 							<div className="flex gap-6">
 								<SelectField
@@ -357,10 +358,14 @@ export default function NewListing() {
 								errors={fields.description.errors}
 							/>
 							<ul className="flex items-center gap-6">
-								{imageList.map(image => {
+								{imageList.map((image, index) => {
 									return (
 										<li key={image.key}>
-											<ImageChooser config={image} />
+											<ImageChooser
+												config={image}
+												formFields={fields}
+												index={index}
+											/>
 										</li>
 									)
 								})}
@@ -399,7 +404,15 @@ export default function NewListing() {
 	)
 }
 
-function ImageChooser({ config }: { config: FieldConfig<ImageFieldset> }) {
+function ImageChooser({
+	config,
+	formFields,
+	index,
+}: {
+	config: FieldConfig<ImageFieldset>
+	formFields: Fieldset<z.infer<typeof ListingSchema>>
+	index: number
+}) {
 	const inputRef = useRef<HTMLInputElement>(null)
 	const fieldsetRef = useRef<HTMLFieldSetElement>(null)
 	const fields = useFieldset(fieldsetRef, config)
@@ -418,6 +431,33 @@ function ImageChooser({ config }: { config: FieldConfig<ImageFieldset> }) {
 			aria-describedby={config.error?.length ? config.errorId : undefined}
 		>
 			<div className="relative h-32 w-32">
+				{previewImage ? (
+					<div className=" hover absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center bg-slate-800/80 opacity-0 hover:opacity-100">
+						<Button
+							className="h-auto rounded-full bg-transparent p-2 ring-offset-0 focus-within:ring-0 hover:bg-primary hover:text-primary-foreground focus-visible:ring-0"
+							formNoValidate={true}
+							name={conform.INTENT}
+							variant="link"
+							onClick={() => inputRef.current?.click()}
+						>
+							<span aria-hidden className="leading-none">
+								<Icon name="pencil-1" />
+							</span>
+							<span className="sr-only">Update Image {index + 1}</span>
+						</Button>
+						<Button
+							className="h-auto rounded-full bg-transparent p-2 ring-offset-0 focus-within:ring-0 hover:bg-primary hover:text-primary-foreground focus-visible:ring-0"
+							formNoValidate={true}
+							variant="link"
+							{...list.remove(formFields.listingImages.name, { index })}
+						>
+							<span aria-hidden className="leading-none">
+								<Icon name="trash" />
+							</span>
+							<span className="sr-only">Remove Image {index + 1}</span>
+						</Button>
+					</div>
+				) : null}
 				<label
 					htmlFor={fields.file.id}
 					className={cn('group absolute h-32 w-32 rounded-lg', {
