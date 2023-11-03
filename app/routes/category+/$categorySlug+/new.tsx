@@ -1,4 +1,11 @@
-import { conform, useForm } from '@conform-to/react'
+import {
+	type FieldConfig,
+	conform,
+	list,
+	useFieldList,
+	useFieldset,
+	useForm,
+} from '@conform-to/react'
 import { getFieldsetConstraint, parse } from '@conform-to/zod'
 import { createId } from '@paralleldrive/cuid2'
 import {
@@ -10,7 +17,7 @@ import {
 	redirect,
 } from '@remix-run/node'
 import { Form, useLoaderData, useParams } from '@remix-run/react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 
 import { GeneralErrorBoundary } from '#app/components/error-boundary.tsx'
@@ -27,9 +34,11 @@ import {
 	CardHeader,
 	CardTitle,
 } from '#app/components/ui/card.tsx'
+import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { requireUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
+import { cn, getListingImgSrc } from '#app/utils/misc.tsx'
 
 const titleMinLength = 1
 const titleMaxLength = 100
@@ -46,8 +55,7 @@ const ImageFieldsetSchema = z.object({
 		.refine(file => {
 			return !file || file.size <= MAX_UPLOAD_SIZE
 		}, 'File size must be less than 3MB'),
-	altText: z.string().optional(),
-	isThumbnail: z.boolean(),
+	isThumbnail: z.coerce.boolean(),
 })
 
 type ImageFieldset = z.infer<typeof ImageFieldsetSchema>
@@ -118,20 +126,6 @@ export async function action({ request, params }: DataFunctionArgs) {
 					message: 'Listing not found!',
 				})
 			}
-
-			const city = await prisma.listingCity.findUnique({
-				select: { id: true },
-				where: {
-					id: data.cityId,
-				},
-			})
-
-			if (!city) {
-				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
-					message: `City not found`,
-				})
-			}
 		}).transform(async ({ listingImages = [], ...data }) => {
 			return {
 				...data,
@@ -141,7 +135,6 @@ export async function action({ request, params }: DataFunctionArgs) {
 						if (imageHasFile(i)) {
 							return {
 								id: i.id,
-								altText: i.altText,
 								contentType: i.file.type,
 								blob: Buffer.from(await i.file.arrayBuffer()),
 								isThumbnail: i.isThumbnail,
@@ -151,7 +144,6 @@ export async function action({ request, params }: DataFunctionArgs) {
 						} else {
 							return {
 								id: i.id,
-								altText: i.altText,
 								isThumbnail: i.isThumbnail,
 							}
 						}
@@ -164,7 +156,6 @@ export async function action({ request, params }: DataFunctionArgs) {
 						.filter(i => !i.id)
 						.map(async image => {
 							return {
-								altText: image.altText,
 								contentType: image.file.type,
 								blob: Buffer.from(await image.file.arrayBuffer()),
 								isThumbnail: image.isThumbnail,
@@ -237,9 +228,24 @@ export default function NewListing() {
 		id: 'listing-editor',
 		constraint: getFieldsetConstraint(ClientSchema),
 		onValidate({ formData }) {
-			return parse(formData, {
-				schema: ClientSchema,
+			console.log('validate')
+			console.log(formData)
+			console.log(formData.get('listingImages'))
+			const submission = parse(formData, {
+				schema: ClientSchema.transform(data => {
+					console.log('transforming...')
+					return {
+						...data,
+						listingImages: [],
+						//  data.listingImages!.map(img => ({
+						// 	...img,
+						// 	isThumbnail: img.isThumbnail === 'on',
+						// })),
+					}
+				}),
 			})
+			console.log(submission)
+			return submission
 		},
 		defaultValue: {
 			listingCategoryId: listingCategories.find(
@@ -248,7 +254,13 @@ export default function NewListing() {
 			title: '',
 			description: '',
 		},
+		onSubmit(_, { formData }) {
+			console.log('submitting')
+			console.log(formData)
+		},
 	})
+
+	const imageList = useFieldList(form.ref, fields.listingImages)
 
 	return (
 		<Card>
@@ -344,25 +356,131 @@ export default function NewListing() {
 								}}
 								errors={fields.description.errors}
 							/>
+							<ul className="flex items-center gap-6">
+								{imageList.map(image => {
+									return (
+										<li key={image.key}>
+											<ImageChooser config={image} />
+										</li>
+									)
+								})}
+							</ul>
 						</div>
 						<ErrorList id={form.errorId} errors={form.errors} />
-						<div className="flex justify-end gap-3">
-							<Button form={form.id} variant="destructive" type="reset">
-								Reset
-							</Button>
-							<StatusButton
-								form={form.id}
-								type="submit"
-								disabled={false}
-								status={'idle'}
+						<div className="mt-6 flex justify-between">
+							<Button
+								{...list.insert(fields.listingImages.name, {
+									defaultValue: { isThumbnail: false },
+								})}
 							>
-								Submit
-							</StatusButton>
+								<span aria-hidden>
+									<Icon name="plus">Image</Icon>
+								</span>
+								<span className="sr-only">Add Image</span>
+							</Button>
+							<div className="flex justify-end gap-3">
+								<Button form={form.id} variant="destructive" type="reset">
+									Reset
+								</Button>
+								<StatusButton
+									form={form.id}
+									type="submit"
+									disabled={false}
+									status={'idle'}
+								>
+									Submit
+								</StatusButton>
+							</div>
 						</div>
 					</Form>
 				</CardContent>
 			</CardContent>
 		</Card>
+	)
+}
+
+function ImageChooser({ config }: { config: FieldConfig<ImageFieldset> }) {
+	const inputRef = useRef<HTMLInputElement>(null)
+	const fieldsetRef = useRef<HTMLFieldSetElement>(null)
+	const fields = useFieldset(fieldsetRef, config)
+	const existingImage = Boolean(fields.id.defaultValue)
+	const [previewImage, setPreviewImage] = useState<string | null>(
+		fields.id.defaultValue ? getListingImgSrc(fields.id.defaultValue) : null,
+	)
+	useEffect(() => {
+		inputRef.current?.click()
+	}, [])
+
+	return (
+		<fieldset
+			ref={fieldsetRef}
+			aria-invalid={Boolean(config.errors?.length) || undefined}
+			aria-describedby={config.error?.length ? config.errorId : undefined}
+		>
+			<div className="relative h-32 w-32">
+				<label
+					htmlFor={fields.file.id}
+					className={cn('group absolute h-32 w-32 rounded-lg', {
+						'bg-accent opacity-40 focus-within:opacity-100 hover:opacity-100':
+							!previewImage,
+					})}
+				>
+					{previewImage ? (
+						<img
+							src={previewImage}
+							alt=""
+							className="h-32 w-32 rounded-lg object-cover"
+						/>
+					) : (
+						<div className="flex h-32 w-32 items-center justify-center rounded-lg border border-muted-foreground text-4xl text-muted-foreground">
+							<Icon name="plus" />
+						</div>
+					)}
+					{existingImage ? (
+						<input
+							{...conform.input(fields.id, {
+								type: 'hidden',
+								ariaAttributes: true,
+							})}
+						/>
+					) : null}
+					<input
+						{...conform.input(fields.isThumbnail, {
+							type: 'checkbox',
+						})}
+						className="hidden"
+					/>
+					<input
+						aria-label="Image"
+						ref={inputRef}
+						className="absolute left-0 top-0 z-0 h-32 w-32 cursor-pointer opacity-0"
+						onChange={e => {
+							const file = e.target.files?.[0]
+
+							if (file) {
+								const reader = new FileReader()
+								reader.onloadend = () => {
+									setPreviewImage(reader.result as string)
+								}
+
+								reader.readAsDataURL(file)
+							} else {
+								setPreviewImage(null)
+							}
+						}}
+						accept="image/*"
+						{...conform.input(fields.file, {
+							type: 'file',
+							ariaAttributes: true,
+						})}
+					/>
+				</label>
+			</div>
+			<div className="divide-y px-4 pb-3 pt-1">
+				<ErrorList id={fields.file.errorId} errors={fields.file.errors} />
+				<ErrorList id={config.errorId} errors={config.errors} />
+			</div>
+		</fieldset>
 	)
 }
 

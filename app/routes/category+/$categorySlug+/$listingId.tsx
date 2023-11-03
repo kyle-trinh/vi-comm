@@ -47,6 +47,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			listingImages: {
 				select: {
 					id: true,
+					isThumbnail: true,
 				},
 			},
 			_count: {

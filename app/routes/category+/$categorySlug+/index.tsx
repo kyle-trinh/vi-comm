@@ -86,7 +86,7 @@ export default function CategorySlugIndex() {
 }
 
 const EmptyCard = () => (
-	<Card className=" h-[calc(100vh/2)]">
+	<Card className=" h-[calc(100vh/2)] w-full">
 		<CardContent className="flex h-full flex-col items-center justify-center gap-2 text-gray-500">
 			<Icon name="value-none" className="text-3xl" />
 			<p className="text-2xl">Such empty</p>
