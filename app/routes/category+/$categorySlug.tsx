@@ -30,8 +30,8 @@ export default function CategorySlugIndex() {
 	const { listingCategories } = useLoaderData<typeof loader>()
 
 	return (
-		<div className="container grid h-full min-h-[400px] grid-cols-7 items-start gap-6">
-			<Card className="col-span-2 inline-block">
+		<div className="container grid  min-h-[400px] grid-cols-7 items-start gap-6">
+			<Card className="col-span-2">
 				<CardHeader>
 					<CardTitle>Category</CardTitle>
 				</CardHeader>

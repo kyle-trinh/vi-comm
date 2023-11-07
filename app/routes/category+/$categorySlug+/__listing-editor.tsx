@@ -6,18 +6,30 @@ import {
 	useFieldset,
 	useForm,
 	type Fieldset,
+	validate,
 } from '@conform-to/react'
 import { getFieldsetConstraint, parse } from '@conform-to/zod'
 import { createId } from '@paralleldrive/cuid2'
+import {
+	type ListingCity,
+	type Listing,
+	type ListingImage,
+} from '@prisma/client'
 import {
 	unstable_parseMultipartFormData as parseMultipartFormData,
 	type DataFunctionArgs,
 	unstable_createMemoryUploadHandler as createMemoryUploadHandler,
 	json,
-	type LoaderFunctionArgs,
 	redirect,
+	type SerializeFrom,
 } from '@remix-run/node'
-import { Form, useLoaderData, useParams } from '@remix-run/react'
+import {
+	Form,
+	useFetcher,
+	useNavigation,
+	useParams,
+	useRouteLoaderData,
+} from '@remix-run/react'
 import { useEffect, useRef, useState } from 'react'
 import { z } from 'zod'
 
@@ -26,6 +38,7 @@ import {
 	ErrorList,
 	Field,
 	SelectField,
+	SwitchField,
 	TextareaField,
 } from '#app/components/forms.tsx'
 import { Button } from '#app/components/ui/button.tsx'
@@ -37,6 +50,7 @@ import {
 } from '#app/components/ui/card.tsx'
 import { Icon } from '#app/components/ui/icon.tsx'
 import { StatusButton } from '#app/components/ui/status-button.tsx'
+import { type loader as categorySlugLoader } from '#app/routes/category+/$categorySlug.tsx'
 import { requireUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { cn, getListingImgSrc } from '#app/utils/misc.tsx'
@@ -83,24 +97,23 @@ const ListingSchema = z.object({
 	title: z.string().min(titleMinLength).max(titleMaxLength),
 	description: z.string().min(descriptionMinLength).max(descriptionMaxLength),
 	listingCategoryId: z.string(),
-	listingImages: z.array(ImageFieldsetSchema).optional(),
+	listingImages: z
+		.array(ImageFieldsetSchema)
+		.optional()
+		.superRefine((val, ctx) => {
+			if (!val) return
+			const isThumbnailTrue = val.filter(image => !!image.isThumbnail)
+			if (isThumbnailTrue.length > 1) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: 'Each listing can only have at most 1 thumbnail!',
+				})
+			}
+		}),
 	cityId: z.string(),
 })
 
-export async function loader({ request }: LoaderFunctionArgs) {
-	await requireUserId(request)
-	const listingCategories = await prisma.listingCategory.findMany({
-		select: {
-			slug: true,
-			title: true,
-			id: true,
-		},
-	})
-
-	return json({ listingCategories })
-}
-
-export async function action({ request, params }: DataFunctionArgs) {
+export async function action({ request }: DataFunctionArgs) {
 	const userId = await requireUserId(request)
 
 	const formData = await parseMultipartFormData(
@@ -187,7 +200,14 @@ export async function action({ request, params }: DataFunctionArgs) {
 	} = submission.value
 
 	const listing = await prisma.listing.upsert({
-		select: { id: true },
+		select: {
+			id: true,
+			listingCategory: {
+				select: {
+					slug: true,
+				},
+			},
+		},
 		where: { id: listingId ?? '__new_listing__' },
 		create: {
 			ownerId: userId,
@@ -206,45 +226,64 @@ export async function action({ request, params }: DataFunctionArgs) {
 				deleteMany: { id: { notIn: imageUpdates.map(i => i.id) } },
 				updateMany: imageUpdates.map(updates => ({
 					where: { id: updates.id },
-					data: { ...updates, id: updates.blob ? createId() : updates.id },
+					data: { ...updates, id: updates.blob ? createId() : updates.id }, // Update ID for updated images with new file
 				})),
 				create: newImages,
 			},
 		},
 	})
 
-	return redirect(`/category/${params.categorySlug}/${listing.id}`)
+	return redirect(`/category/${listing.listingCategory.slug}/${listing.id}`)
 }
 
-export default function NewListing() {
-	const { listingCategories } = useLoaderData<typeof loader>()
+export function ListingEditor({
+	listing,
+}: {
+	listing?: SerializeFrom<
+		Pick<Listing, 'id' | 'title' | 'description' | 'listingCategoryId'> & {
+			listingImages: Array<Pick<ListingImage, 'id' | 'isThumbnail'>>
+		} & {
+			city: Pick<ListingCity, 'id' | 'province'>
+		}
+	>
+}) {
+	const data = useRouteLoaderData<typeof categorySlugLoader>(
+		'routes/category+/$categorySlug',
+	)
 	const params = useParams()
 	const [selectedProvince, setSelectedProvince] = useState<
 		keyof typeof canadianCities | ''
-	>('')
+	>((listing?.city.province as keyof typeof canadianCities) || '')
 
 	const ClientSchema = ListingSchema.extend({ province: z.string() })
+
+	const listingFetcher = useFetcher<typeof action>()
+	const transition = useNavigation()
+	const isPending = transition.state !== 'idle'
 
 	const [form, fields] = useForm({
 		id: 'listing-editor',
 		constraint: getFieldsetConstraint(ClientSchema),
+		lastSubmission: listingFetcher.data?.submission,
 		onValidate({ formData }) {
-			const submission = parse(formData, {
-				schema: ClientSchema.transform(data => {
-					return {
-						...data,
-						listingImages: [],
-					}
-				}),
+			return parse(formData, {
+				schema: ClientSchema,
 			})
-			return submission
 		},
 		defaultValue: {
-			listingCategoryId: listingCategories.find(
-				cat => cat.slug === params.categorySlug,
-			)!.id,
-			title: '',
-			description: '',
+			listingCategoryId:
+				listing?.listingCategoryId ??
+				data?.listingCategories.find(cat => cat.slug === params.categorySlug)!
+					.id ??
+				'',
+			title: listing?.title ?? '',
+			description: listing?.description ?? '',
+			cityId: listing?.city.id ?? '',
+			listingImages:
+				listing?.listingImages.map(image => ({
+					...image,
+					isThumbnail: image.isThumbnail ? 'on' : 'off',
+				})) ?? [],
 		},
 	})
 
@@ -253,7 +292,7 @@ export default function NewListing() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>New Listing</CardTitle>
+				<CardTitle>{listing ? 'Update Listing' : 'New Listing'}</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<CardContent>
@@ -264,6 +303,9 @@ export default function NewListing() {
 					    rather than the first button in the form (which is delete/add image).
 				        */}
 						<button type="submit" className="hidden" />
+						{listing ? (
+							<input type="hidden" name="id" value={listing.id} />
+						) : null}
 						<div className="flex flex-col gap-1">
 							<SelectField
 								labelProps={{ children: 'Listing Category' }}
@@ -271,7 +313,7 @@ export default function NewListing() {
 									...conform.select(fields.listingCategoryId, {
 										ariaAttributes: true,
 									}),
-									children: listingCategories.map(({ id, title }) => (
+									children: data?.listingCategories.map(({ id, title }) => (
 										<option value={id} key={id}>
 											{title}
 										</option>
@@ -300,7 +342,7 @@ export default function NewListing() {
 										value: selectedProvince,
 										onChange: e =>
 											setSelectedProvince(
-												e.target.value as keyof typeof canadianCities | '',
+												(e.target.value as keyof typeof canadianCities) || '',
 											),
 									}}
 									errors={fields.province.errors}
@@ -352,11 +394,16 @@ export default function NewListing() {
 												config={image}
 												formFields={fields}
 												index={index}
+												form={form}
 											/>
 										</li>
 									)
 								})}
 							</ul>
+							<ErrorList
+								id={fields.listingImages.errorId}
+								errors={fields.listingImages.errors}
+							/>
 						</div>
 						<ErrorList id={form.errorId} errors={form.errors} />
 						<div className="mt-6 flex justify-between">
@@ -377,8 +424,8 @@ export default function NewListing() {
 								<StatusButton
 									form={form.id}
 									type="submit"
-									disabled={false}
-									status={'idle'}
+									disabled={isPending}
+									status={isPending ? 'pending' : 'idle'}
 								>
 									Submit
 								</StatusButton>
@@ -395,10 +442,12 @@ function ImageChooser({
 	config,
 	formFields,
 	index,
+	form,
 }: {
 	config: FieldConfig<ImageFieldset>
 	formFields: Fieldset<z.infer<typeof ListingSchema>>
 	index: number
+	form: any
 }) {
 	const inputRef = useRef<HTMLInputElement>(null)
 	const fieldsetRef = useRef<HTMLFieldSetElement>(null)
@@ -407,19 +456,44 @@ function ImageChooser({
 	const [previewImage, setPreviewImage] = useState<string | null>(
 		fields.id.defaultValue ? getListingImgSrc(fields.id.defaultValue) : null,
 	)
+	const validationTriggerRef = useRef<HTMLButtonElement>(null)
 	useEffect(() => {
-		inputRef.current?.click()
-	}, [])
+		if (!existingImage) {
+			inputRef.current?.click()
+		}
+	}, [existingImage])
 
 	return (
 		<fieldset
 			ref={fieldsetRef}
 			aria-invalid={Boolean(config.errors?.length) || undefined}
 			aria-describedby={config.error?.length ? config.errorId : undefined}
+			className=" flex flex-col items-center justify-start"
 		>
+			<button
+				{...validate('listingImages')}
+				hidden
+				ref={validationTriggerRef}
+			/>
+			<SwitchField
+				labelProps={{
+					htmlFor: fields.isThumbnail.id,
+					children: 'Thumbnail',
+				}}
+				buttonProps={{
+					...conform.input(fields.isThumbnail, {
+						type: 'checkbox',
+						ariaAttributes: true,
+					}),
+					onCheckedChange: () => {
+						validationTriggerRef.current?.click()
+					},
+				}}
+				errors={fields.isThumbnail.errors}
+			/>
 			<div className="relative h-32 w-32">
 				{previewImage ? (
-					<div className=" hover absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center bg-slate-800/80 opacity-0 hover:opacity-100">
+					<div className="hover absolute left-0 top-0 z-10 flex h-full w-full items-center justify-center rounded-lg bg-slate-800/80 opacity-0 hover:opacity-100">
 						<Button
 							className="h-auto rounded-full bg-transparent p-2 ring-offset-0 focus-within:ring-0 hover:bg-primary hover:text-primary-foreground focus-visible:ring-0"
 							formNoValidate={true}
@@ -434,7 +508,6 @@ function ImageChooser({
 						</Button>
 						<Button
 							className="h-auto rounded-full bg-transparent p-2 ring-offset-0 focus-within:ring-0 hover:bg-primary hover:text-primary-foreground focus-visible:ring-0"
-							formNoValidate={true}
 							variant="link"
 							{...list.remove(formFields.listingImages.name, { index })}
 						>
@@ -455,7 +528,7 @@ function ImageChooser({
 					{previewImage ? (
 						<img
 							src={previewImage}
-							alt=""
+							alt={`Listing images number ${index + 1}`}
 							className="h-32 w-32 rounded-lg object-cover"
 						/>
 					) : (
@@ -471,12 +544,7 @@ function ImageChooser({
 							})}
 						/>
 					) : null}
-					<input
-						{...conform.input(fields.isThumbnail, {
-							type: 'checkbox',
-						})}
-						className="hidden"
-					/>
+
 					<input
 						aria-label="Image"
 						ref={inputRef}

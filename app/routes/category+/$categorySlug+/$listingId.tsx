@@ -18,6 +18,7 @@ import { StatusButton } from '#app/components/ui/status-button.tsx'
 import { getUserId } from '#app/utils/auth.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
 import { getListingImgSrc, getUserImgSrc, invariant } from '#app/utils/misc.tsx'
+import { useOptionalUser } from '#app/utils/user.ts'
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
 	const userId = await getUserId(request)
@@ -65,6 +66,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 			id: params.listingId,
 		},
 	})
+	console.log(listing)
 
 	invariant(listing, 'Listing not found')
 
@@ -77,6 +79,8 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export default function ListingIndex() {
 	const { hasLiked, isLoggedIn, listing } = useLoaderData<typeof loader>()
+	const user = useOptionalUser()
+	const isOwner = user?.id === listing.owner.id
 	const favoriteFetcher = useFetcher()
 
 	const renderImages = () => {
@@ -175,6 +179,22 @@ export default function ListingIndex() {
 							</HoverCard>
 						</span>
 					</p>
+					{isOwner && (
+						<div className="flex gap-2">
+							<Button variant="destructive">
+								<Icon name="trash" className="scale-125 max-md:scale-150">
+									<span className="max-md:hidden">Delete</span>
+								</Icon>
+							</Button>
+							<Button asChild>
+								<Link to="edit">
+									<Icon name="pencil-1" className="scale-125 max-md:scale-150">
+										<span className="max-md:hidden">Edit</span>
+									</Icon>
+								</Link>
+							</Button>
+						</div>
+					)}
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
